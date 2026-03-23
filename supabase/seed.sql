@@ -1,0 +1,9 @@
+-- Demo seed notes
+-- Create 149 rooms in hotel_rooms (mostly doppie, 15 triple, 2 quadruple).
+-- Demo scenario changes include:
+-- room 214 partenza -> fermata
+-- room 307 doppia -> tripla
+-- room 118 urgente
+-- room 512 fuori servizio
+-- room 409 reassigned
+-- For app demo mode, equivalent seed is in src/data/demoData.ts.
