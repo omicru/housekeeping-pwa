@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+@layer components {
+  .btn-primary {
+    @apply w-full rounded-xl bg-slate-900 px-4 py-3 text-base font-semibold text-white;
+  }
+
+  .btn-secondary {
+    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-800;
+  }
+
+  .card {
+    @apply rounded-2xl bg-white p-4 shadow-sm border border-slate-200;
+  }
+
+  .chip {
+    @apply rounded-full px-3 py-1 text-xs font-semibold;
+  }
+}
