@@ -1,106 +1,68 @@
-# Housekeeping Hotel PWA (V1)
+# Housekeeping Hotel PWA (V1.5 demo)
 
-PWA mobile-first in italiano per operazioni housekeeping hotel.
+PWA mobile-first in italiano per operazioni housekeeping reali (supervisor, cameriere ai piani, facchini).
 
-## Architettura rapida
+## Cosa include questa V1.5
 
-- **Frontend:** React + TypeScript + Vite + Tailwind.
-- **Routing:** `react-router-dom` con viste dedicate per ruolo.
-- **State/data in V1 demo:** `AppContext` con dataset realistico locale e log attività.
-- **Backend target:** Supabase (Auth + Postgres + Realtime) con schema SQL e policy RLS in `supabase/schema.sql`.
-- **PWA:** manifest e service worker via `vite-plugin-pwa`.
+- **Mappa camere reale** implementata esattamente da specifica (piani 0..6, esclusioni corrette, triple/quadruple corrette).
+- **Ruoli demo** separati: supervisor, cameriera, facchino.
+- **Workflow cameriera** con sezioni distinte:
+  - Camere da fare
+  - Camere in corso
+  - Camere completate
+- **Workflow facchino** con sezioni distinte:
+  - Task da fare
+  - Task in corso
+  - Task completate
+- **Flow completamento camera in 3 step**:
+  1. Biancheria (selector 0..4)
+  2. Minibar (selector 0..4)
+  3. Conferma finale
+- **Supervisor dashboard operativa** con assegnazione bulk:
+  - filtro piano
+  - filtro solo camere non assegnate
+  - selezione multipla camere
+  - assegnazione in un tap verso una cameriera
+  - conteggio carico camere per cameriera (target pratico ~14/15)
+- **Totali giornalieri demo**:
+  - biancheria
+  - minibar
 
-## Flusso core implementato
+## Stack
 
-1. Supervisor apre dashboard/crea giornata.
-2. Cameriera vede solo camere assegnate.
-3. Tap su **Completata** apre schermata biancheria (0..4).
-4. Conferma salva quantità per camera/operatore.
-5. Camera passa a completata.
-6. Supervisor vede progresso e totali biancheria aggiornati.
+- React + TypeScript + Vite + Tailwind
+- Routing con `react-router-dom`
+- PWA (`vite-plugin-pwa`)
+- Data model locale pulito, pronto a futura migrazione Supabase
 
 ## Route principali
 
-- `/` Login
-- `/supervisor` Dashboard supervisore
-- `/setup` Setup giornata
-- `/rooms` Lista camere
-- `/rooms/:id` Dettaglio camera
+- `/` Login demo
+- `/supervisor` Dashboard supervisor
 - `/cameriera` Vista cameriera
 - `/facchino` Vista facchino
-- `/issue` Segnalazioni
-- `/history` Storico audit
-- `/users` Gestione utenti
 
-## Demo data inclusi
-
-- 149 camere (prevalenza doppie, 15 triple, 2 quadruple)
-- Casi realistici:
-  - 214 partenza->fermata
-  - 307 doppia->tripla
-  - 118 urgente
-  - 512 fuori servizio
-  - 409 riassegnata
-- Utenti demo: 1 supervisor, 3 cameriere, 2 facchini
-
-## Setup locale (macchina sviluppo)
-
-### Requisiti
-
-- Node.js **20.x LTS** o **22.x LTS**
-- npm **10+**
-
-### Installazione e avvio
+## Avvio locale
 
 ```bash
-git clone <your-repo-url>
-cd housekeeping-pwa
 npm install
 npm run dev
 ```
 
-L'app sarà disponibile su `http://localhost:5173`.
-
-### Verifiche richieste
-
-`npm run typecheck` usa `tsc -b` e valida sia il progetto app che i progetti referenziati (incluso `vite.config.ts`).
+## Verifiche
 
 ```bash
 npm run typecheck
 npm run build
-npm run preview
 ```
 
-### Se vedi errori su `vite/client` o `node` types
+## Nota architetturale
 
-Di solito significa che i `devDependencies` non sono installati. Esegui:
+Il modello dati locale separa chiaramente:
 
-```bash
-rm -rf node_modules package-lock.json
-npm install
-npm run typecheck
-npm run build
-```
+- camere (`HotelRoom`)
+- assegnazioni giornaliere (`DailyRoomAssignment`)
+- completamenti con consumi (`RoomCompletion`)
+- task facchini (`FacchinoTask`)
 
-## Deploy (esempio Vercel/Netlify)
-
-1. Collegare repository.
-2. Build command: `npm run build`
-3. Output dir: `dist`
-4. Configurare variabili Supabase future:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-
-## Tradeoff V1
-
-- La demo usa store locale per garantire avvio immediato senza backend.
-- Lo schema Supabase è pronto, ma integrazione auth/realtime live è il prossimo step.
-- Filtri avanzati dashboard sono minimi in V1.
-
-## V2 suggerito
-
-- Collegamento completo a Supabase Auth + realtime channels.
-- Sincronizzazione offline write queue.
-- Export giornaliero Excel/PDF.
-- Config checklist più avanzata per camera.
-- Notifiche push per modifiche urgenti.
+Questa struttura è pensata per passare facilmente a Supabase (tabelle relazionali + realtime) in un secondo step.

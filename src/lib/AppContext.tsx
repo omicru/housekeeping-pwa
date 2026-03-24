@@ -1,150 +1,129 @@
 import { createContext, useContext, useMemo, useState } from 'react';
 import {
-  ActivityLog,
-  AppSettings,
   AppUser,
   DailyRoomAssignment,
   FacchinoTask,
-  IssueReport,
-  LinenEntry,
-  WorkState
+  HotelRoom,
+  LinenUsage,
+  MinibarUsage,
+  RoomCompletion,
+  RoomWorkStatus
 } from './types';
-import { demoIssues, demoLinenEntries, demoRooms, demoSettings, demoTasks, demoUsers } from '../data/demoData';
+import {
+  demoAssignments,
+  demoCompletions,
+  demoFacchinoTasks,
+  demoRooms,
+  demoUsers,
+  emptyLinenUsage,
+  emptyMinibarUsage
+} from '../data/demoData';
 
-interface LinenPayload {
-  federe: number;
-  lenzuolo: number;
-  coprilenzuolo: number;
-  asciugamaniViso: number;
-  asciugamaniGrandi: number;
-  asciugamaniBidet: number;
+interface CompletionDraft {
+  assignmentId: string;
+  linen: LinenUsage;
+  minibar: MinibarUsage;
 }
 
 interface AppContextShape {
   currentUser: AppUser | null;
   users: AppUser[];
-  rooms: DailyRoomAssignment[];
-  tasks: FacchinoTask[];
-  issues: IssueReport[];
-  linenEntries: LinenEntry[];
-  settings: AppSettings;
-  activity: ActivityLog[];
+  rooms: HotelRoom[];
+  assignments: DailyRoomAssignment[];
+  facchinoTasks: FacchinoTask[];
+  completions: RoomCompletion[];
   login: (email: string) => boolean;
   logout: () => void;
-  updateRoom: (roomId: string, patch: Partial<DailyRoomAssignment>, actorId: string) => void;
-  startRoom: (roomId: string, actorId: string) => void;
-  completeRoom: (roomId: string, linen: LinenPayload, actorId: string) => void;
-  reportIssue: (issue: Omit<IssueReport, 'id' | 'createdAt' | 'date'>, actorId: string) => void;
-  startTask: (taskId: string, actorId: string) => void;
-  completeTask: (taskId: string, actorId: string) => void;
-  createWorkday: () => void;
+  getRoomById: (roomId: string) => HotelRoom | undefined;
+  assignRoomsBulk: (roomIds: string[], camerieraId: string) => void;
+  setRoomStatus: (assignmentId: string, status: RoomWorkStatus) => void;
+  completeRoomWithUsage: (assignmentId: string, linen: LinenUsage, minibar: MinibarUsage, userId: string) => void;
+  updateFacchinoTaskStatus: (taskId: string, status: FacchinoTask['status']) => void;
+  createCompletionDraft: (assignmentId: string) => CompletionDraft;
 }
 
 const AppContext = createContext<AppContextShape | undefined>(undefined);
 
-const day = new Date().toISOString().slice(0, 10);
-
 export function AppProvider({ children }: { children: React.ReactNode }): JSX.Element {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
-  const [rooms, setRooms] = useState<DailyRoomAssignment[]>(demoRooms);
-  const [tasks, setTasks] = useState<FacchinoTask[]>(demoTasks);
-  const [issues, setIssues] = useState<IssueReport[]>(demoIssues);
-  const [linenEntries, setLinenEntries] = useState<LinenEntry[]>(demoLinenEntries);
-  const [settings] = useState<AppSettings>(demoSettings);
-  const [activity, setActivity] = useState<ActivityLog[]>([]);
+  const [assignments, setAssignments] = useState<DailyRoomAssignment[]>(demoAssignments);
+  const [facchinoTasks, setFacchinoTasks] = useState<FacchinoTask[]>(demoFacchinoTasks);
+  const [completions, setCompletions] = useState<RoomCompletion[]>(demoCompletions);
 
-  const logAction = (userId: string, action: string, targetType: ActivityLog['targetType'], targetId: string, detail: string): void => {
-    setActivity((prev) => [
-      {
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-        userId,
-        action,
-        targetType,
-        targetId,
-        detail
-      },
-      ...prev
-    ]);
-  };
-
-  const updateRoom = (roomId: string, patch: Partial<DailyRoomAssignment>, actorId: string): void => {
-    setRooms((prev) =>
-      prev.map((room) => (room.id === roomId ? { ...room, ...patch, modified: true, lastUpdatedAt: new Date().toISOString() } : room))
+  const assignRoomsBulk = (roomIds: string[], camerieraId: string): void => {
+    const now = new Date().toISOString();
+    const roomIdSet = new Set(roomIds);
+    setAssignments((prev) =>
+      prev.map((assignment) =>
+        roomIdSet.has(assignment.roomId)
+          ? {
+              ...assignment,
+              assignedCamerieraId: camerieraId,
+              status: assignment.status === 'completata' ? assignment.status : 'da_fare',
+              startedAt: undefined,
+              updatedAt: now
+            }
+          : assignment
+      )
     );
-    logAction(actorId, 'room_updated', 'room', roomId, 'Aggiornamento camera');
   };
 
-  const updateRoomFlow = (roomId: string, actorId: string, workflowStatus: WorkState): void => {
-    setRooms((prev) =>
-      prev.map((room) => {
-        if (room.id !== roomId) return room;
-        const now = new Date().toISOString();
-        if (workflowStatus === 'in_corso') {
-          return { ...room, workflowStatus, startedAt: now, lastUpdatedAt: now };
+  const setRoomStatus = (assignmentId: string, status: RoomWorkStatus): void => {
+    const now = new Date().toISOString();
+    setAssignments((prev) =>
+      prev.map((assignment) => {
+        if (assignment.id !== assignmentId) return assignment;
+        if (status === 'in_corso') {
+          return { ...assignment, status, startedAt: now, updatedAt: now };
         }
-        return { ...room, workflowStatus, completedAt: now, completedBy: actorId, lastUpdatedAt: now };
+        if (status === 'da_fare') {
+          return { ...assignment, status, startedAt: undefined, updatedAt: now };
+        }
+        return assignment;
       })
     );
   };
 
-  const startRoom = (roomId: string, actorId: string): void => {
-    updateRoomFlow(roomId, actorId, 'in_corso');
-    logAction(actorId, 'room_started', 'room', roomId, 'Camera iniziata');
-  };
+  const completeRoomWithUsage = (assignmentId: string, linen: LinenUsage, minibar: MinibarUsage, userId: string): void => {
+    const now = new Date().toISOString();
+    setAssignments((prev) =>
+      prev.map((assignment) =>
+        assignment.id === assignmentId ? { ...assignment, status: 'completata', completedBy: userId, completedAt: now, updatedAt: now } : assignment
+      )
+    );
 
-  const completeRoom = (roomId: string, linen: LinenPayload, actorId: string): void => {
-    updateRoomFlow(roomId, actorId, 'completata');
-    setLinenEntries((prev) => [
+    const completedAssignment = assignments.find((assignment) => assignment.id === assignmentId);
+    if (!completedAssignment) return;
+
+    setCompletions((prev) => [
       {
         id: crypto.randomUUID(),
-        roomAssignmentId: roomId,
-        userId: actorId,
-        createdAt: new Date().toISOString(),
-        ...linen
+        assignmentId,
+        roomId: completedAssignment.roomId,
+        date: completedAssignment.date,
+        userId,
+        linen,
+        minibar,
+        createdAt: now
       },
       ...prev
     ]);
-    logAction(actorId, 'room_completed', 'room', roomId, `Camera completata con biancheria: ${JSON.stringify(linen)}`);
   };
 
-  const reportIssue = (issue: Omit<IssueReport, 'id' | 'createdAt' | 'date'>, actorId: string): void => {
-    const created = { ...issue, id: crypto.randomUUID(), createdAt: new Date().toISOString(), date: day };
-    setIssues((prev) => [created, ...prev]);
-    logAction(actorId, 'issue_reported', 'issue', created.id, created.category);
-  };
-
-  const startTask = (taskId: string, actorId: string): void => {
-    setTasks((prev) =>
-      prev.map((task) => (task.id === taskId ? { ...task, status: 'in_corso', updatedAt: new Date().toISOString() } : task))
+  const updateFacchinoTaskStatus = (taskId: string, status: FacchinoTask['status']): void => {
+    setFacchinoTasks((prev) =>
+      prev.map((task) => (task.id === taskId ? { ...task, status, updatedAt: new Date().toISOString() } : task))
     );
-    logAction(actorId, 'task_started', 'task', taskId, 'Task in corso');
-  };
-
-  const completeTask = (taskId: string, actorId: string): void => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId ? { ...task, status: 'fatto', completedBy: actorId, updatedAt: new Date().toISOString() } : task
-      )
-    );
-    logAction(actorId, 'task_completed', 'task', taskId, 'Task completato');
-  };
-
-  const createWorkday = (): void => {
-    setRooms((prev) => prev.map((room) => ({ ...room, date: day })));
-    setTasks((prev) => prev.map((task) => ({ ...task, date: day })));
   };
 
   const value = useMemo(
     () => ({
       currentUser,
       users: demoUsers,
-      rooms,
-      tasks,
-      issues,
-      linenEntries,
-      settings,
-      activity,
+      rooms: demoRooms,
+      assignments,
+      facchinoTasks,
+      completions,
       login: (email: string) => {
         const user = demoUsers.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.isActive);
         if (!user) return false;
@@ -152,15 +131,14 @@ export function AppProvider({ children }: { children: React.ReactNode }): JSX.El
         return true;
       },
       logout: () => setCurrentUser(null),
-      updateRoom,
-      startRoom,
-      completeRoom,
-      reportIssue,
-      startTask,
-      completeTask,
-      createWorkday
+      getRoomById: (roomId: string) => demoRooms.find((room) => room.id === roomId),
+      assignRoomsBulk,
+      setRoomStatus,
+      completeRoomWithUsage,
+      updateFacchinoTaskStatus,
+      createCompletionDraft: (assignmentId: string) => ({ assignmentId, linen: emptyLinenUsage(), minibar: emptyMinibarUsage() })
     }),
-    [activity, currentUser, issues, linenEntries, rooms, settings, tasks]
+    [assignments, completions, currentUser, facchinoTasks]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

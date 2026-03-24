@@ -1,89 +1,119 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LinenModal } from '../components/LinenModal';
 import { useApp } from '../lib/AppContext';
-import { formatTime, statusColor } from '../lib/format';
+import { LinenUsage, MinibarUsage, RoomType, RoomWorkStatus } from '../lib/types';
+
+interface RoomCardItem {
+  assignmentId: string;
+  roomId: string;
+  roomNumber: string;
+  floor: number;
+  roomType: RoomType;
+  status: RoomWorkStatus;
+  supervisorNote?: string;
+}
 
 export function CamerieraTodayPage(): JSX.Element {
-  const { currentUser, rooms, startRoom, completeRoom, reportIssue, settings } = useApp();
-  const [linenRoomId, setLinenRoomId] = useState<string | null>(null);
-  const [showCompleted, setShowCompleted] = useState(false);
+  const { assignments, currentUser, getRoomById, setRoomStatus, completeRoomWithUsage, createCompletionDraft } = useApp();
+  const [draft, setDraft] = useState<{ assignmentId: string; linen: LinenUsage; minibar: MinibarUsage } | null>(null);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
 
   if (!currentUser) return <p>Utente non autenticato.</p>;
 
-  const mine = rooms.filter((room) => room.assignedUserId === currentUser.id);
-  const activeRooms = mine.filter((room) => room.workflowStatus !== 'completata');
-  const completedRooms = mine.filter((room) => room.workflowStatus === 'completata');
+  const myRooms = useMemo(() => {
+    const rows: RoomCardItem[] = [];
+    assignments.forEach((assignment) => {
+      if (assignment.assignedCamerieraId !== currentUser.id) return;
+      const room = getRoomById(assignment.roomId);
+      if (!room) return;
+      rows.push({
+        assignmentId: assignment.id,
+        roomId: room.id,
+        roomNumber: room.roomNumber,
+        floor: room.floor,
+        roomType: room.roomType,
+        status: assignment.status,
+        supervisorNote: assignment.supervisorNote
+      });
+    });
+    return rows.sort((a, b) => Number(a.roomNumber) - Number(b.roomNumber));
+  }, [assignments, currentUser.id, getRoomById]);
 
-  return (
-    <div className="space-y-3">
-      <div className="card">
-        <p className="text-sm text-slate-500">Cameriera</p>
-        <h2 className="text-2xl font-bold">{currentUser.fullName}</h2>
-        <p className="text-sm">Camere attive: {activeRooms.length}</p>
+  const daFare = myRooms.filter((room) => room.status === 'da_fare');
+  const inCorso = myRooms.filter((room) => room.status === 'in_corso');
+  const completate = myRooms.filter((room) => room.status === 'completata');
+
+  const openCompletionWizard = (assignmentId: string): void => {
+    setDraft(createCompletionDraft(assignmentId));
+    setStep(1);
+  };
+
+  const renderRoomCard = (room: RoomCardItem): JSX.Element => (
+    <article key={room.assignmentId} className="card space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-2xl font-bold">{room.roomNumber}</h3>
+        <span className="chip bg-slate-100 text-slate-700">Piano {room.floor}</span>
       </div>
-      {activeRooms.map((room) => (
-        <article key={room.id} className="card space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold">{room.roomNumber}</h3>
-            {room.modified && <span className="chip bg-red-100 text-red-700">MODIFICATA</span>}
-          </div>
-          <p className="text-sm">Piano {room.floor} · Stato {room.housekeepingStatus} · Persone {room.peopleCount}</p>
-          <div className="flex flex-wrap gap-1">
-            <span className={`chip ${statusColor(room.workflowStatus)}`}>{room.workflowStatus}</span>
-            {room.extraBed && <span className="chip bg-indigo-100 text-indigo-700">Letto extra</span>}
-            {room.balcony && <span className="chip bg-teal-100 text-teal-700">Balcone</span>}
-            {(room.roomType === 'tripla' || room.roomType === 'quadrupla') && <span className="chip bg-purple-100 text-purple-700">{room.roomType}</span>}
-          </div>
-          {room.supervisorNote && <p className="rounded-lg bg-red-50 p-2 text-sm font-semibold text-red-700">Nota: {room.supervisorNote}</p>}
-          <p className="text-xs text-slate-500">Ultimo aggiornamento {formatTime(room.lastUpdatedAt)}</p>
-          <div className="grid grid-cols-3 gap-2">
-            <button type="button" onClick={() => startRoom(room.id, currentUser.id)} className="rounded-xl bg-yellow-500 py-3 font-semibold text-white">Inizia</button>
-            <button
-              type="button"
-              onClick={() => {
-                if (settings.mandatoryLinenOnComplete) setLinenRoomId(room.id);
-                else completeRoom(room.id, { federe: 0, lenzuolo: 0, coprilenzuolo: 0, asciugamaniViso: 0, asciugamaniGrandi: 0, asciugamaniBidet: 0 }, currentUser.id);
-              }}
-              className="rounded-xl bg-green-600 py-3 font-semibold text-white"
-            >
-              Completata
+      <p className="text-sm font-medium text-slate-600">{room.roomType}</p>
+      {room.supervisorNote && <p className="rounded-xl bg-amber-100 p-2 text-sm font-semibold text-amber-800">Nota: {room.supervisorNote}</p>}
+
+      {room.status !== 'completata' && (
+        <div className="grid grid-cols-2 gap-2">
+          {room.status === 'da_fare' ? (
+            <button type="button" className="rounded-xl bg-amber-500 py-3 text-lg font-bold text-white" onClick={() => setRoomStatus(room.assignmentId, 'in_corso')}>
+              Inizia
             </button>
-            <button
-              type="button"
-              onClick={() => reportIssue({ createdBy: currentUser.id, roomAssignmentId: room.id, category: 'richiesta_supervisor', note: `Supporto richiesto camera ${room.roomNumber}` }, currentUser.id)}
-              className="rounded-xl bg-red-600 py-3 font-semibold text-white"
-            >
-              Segnala
+          ) : (
+            <button type="button" className="rounded-xl border border-slate-300 py-3 text-lg font-bold" onClick={() => setRoomStatus(room.assignmentId, 'da_fare')}>
+              Rimetti da fare
             </button>
-          </div>
-        </article>
-      ))}
-      <button type="button" className="w-full rounded-xl border border-slate-300 bg-white py-3 font-semibold" onClick={() => setShowCompleted((prev) => !prev)}>
-        {showCompleted ? 'Nascondi camere completate' : `Mostra camere completate (${completedRooms.length})`}
-      </button>
-      {showCompleted && (
-        <div className="space-y-2">
-          <h3 className="px-1 text-sm font-semibold uppercase tracking-wide text-slate-500">Camere completate</h3>
-          {completedRooms.length === 0 && <p className="card text-sm text-slate-500">Nessuna camera completata.</p>}
-          {completedRooms.map((room) => (
-            <article key={room.id} className="card space-y-1 opacity-80">
-              <div className="flex items-center justify-between">
-                <h4 className="text-lg font-bold">{room.roomNumber}</h4>
-                <span className="chip bg-green-100 text-green-700">completata</span>
-              </div>
-              <p className="text-sm">Piano {room.floor} · {room.roomType}</p>
-              <p className="text-xs text-slate-500">Agg. {formatTime(room.lastUpdatedAt)}</p>
-            </article>
-          ))}
+          )}
+          <button type="button" className="rounded-xl bg-green-600 py-3 text-lg font-bold text-white" onClick={() => openCompletionWizard(room.assignmentId)}>
+            Completata
+          </button>
         </div>
       )}
-      {linenRoomId && (
+    </article>
+  );
+
+  return (
+    <div className="space-y-4">
+      <section className="card">
+        <p className="text-sm text-slate-500">Cameriera ai piani</p>
+        <h2 className="text-2xl font-bold">{currentUser.fullName}</h2>
+        <p className="text-sm">Attive: {daFare.length + inCorso.length} · Completate: {completate.length}</p>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-bold uppercase tracking-wide text-slate-600">Camere da fare ({daFare.length})</h3>
+        {daFare.length === 0 ? <p className="card text-sm text-slate-500">Nessuna camera da fare.</p> : daFare.map(renderRoomCard)}
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-bold uppercase tracking-wide text-slate-600">Camere in corso ({inCorso.length})</h3>
+        {inCorso.length === 0 ? <p className="card text-sm text-slate-500">Nessuna camera in corso.</p> : inCorso.map(renderRoomCard)}
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-bold uppercase tracking-wide text-slate-600">Camere completate ({completate.length})</h3>
+        {completate.length === 0 ? <p className="card text-sm text-slate-500">Nessuna camera completata.</p> : completate.map(renderRoomCard)}
+      </section>
+
+      {draft && (
         <LinenModal
-          onClose={() => setLinenRoomId(null)}
-          onConfirm={(values) => {
-            completeRoom(linenRoomId, values as never, currentUser.id);
-            setLinenRoomId(null);
+          step={step}
+          linen={draft.linen}
+          minibar={draft.minibar}
+          roomLabel={getRoomById(assignments.find((item) => item.id === draft.assignmentId)?.roomId ?? '')?.roomNumber ?? '-'}
+          onClose={() => setDraft(null)}
+          onBack={() => setStep((prev) => (prev === 1 ? 1 : ((prev - 1) as 1 | 2 | 3)))}
+          onNext={() => setStep((prev) => (prev === 3 ? 3 : ((prev + 1) as 1 | 2 | 3)))}
+          onConfirm={() => {
+            completeRoomWithUsage(draft.assignmentId, draft.linen, draft.minibar, currentUser.id);
+            setDraft(null);
           }}
+          onLinenChange={(key, value) => setDraft((prev) => (prev ? { ...prev, linen: { ...prev.linen, [key]: value } } : prev))}
+          onMinibarChange={(key, value) => setDraft((prev) => (prev ? { ...prev, minibar: { ...prev.minibar, [key]: value } } : prev))}
         />
       )}
     </div>
