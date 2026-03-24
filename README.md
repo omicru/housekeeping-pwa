@@ -63,6 +63,8 @@ L'app sarà disponibile su `http://localhost:5173`.
 
 ### Verifiche richieste
 
+`npm run typecheck` usa `tsc -b` e valida sia il progetto app che i progetti referenziati (incluso `vite.config.ts`).
+
 ```bash
 npm run typecheck
 npm run build
