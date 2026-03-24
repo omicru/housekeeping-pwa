@@ -6,19 +6,22 @@ import { formatTime, statusColor } from '../lib/format';
 export function CamerieraTodayPage(): JSX.Element {
   const { currentUser, rooms, startRoom, completeRoom, reportIssue, settings } = useApp();
   const [linenRoomId, setLinenRoomId] = useState<string | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   if (!currentUser) return <p>Utente non autenticato.</p>;
 
   const mine = rooms.filter((room) => room.assignedUserId === currentUser.id);
+  const activeRooms = mine.filter((room) => room.workflowStatus !== 'completata');
+  const completedRooms = mine.filter((room) => room.workflowStatus === 'completata');
 
   return (
     <div className="space-y-3">
       <div className="card">
         <p className="text-sm text-slate-500">Cameriera</p>
         <h2 className="text-2xl font-bold">{currentUser.fullName}</h2>
-        <p className="text-sm">Camere assegnate: {mine.length}</p>
+        <p className="text-sm">Camere attive: {activeRooms.length}</p>
       </div>
-      {mine.map((room) => (
+      {activeRooms.map((room) => (
         <article key={room.id} className="card space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold">{room.roomNumber}</h3>
@@ -55,6 +58,25 @@ export function CamerieraTodayPage(): JSX.Element {
           </div>
         </article>
       ))}
+      <button type="button" className="w-full rounded-xl border border-slate-300 bg-white py-3 font-semibold" onClick={() => setShowCompleted((prev) => !prev)}>
+        {showCompleted ? 'Nascondi camere completate' : `Mostra camere completate (${completedRooms.length})`}
+      </button>
+      {showCompleted && (
+        <div className="space-y-2">
+          <h3 className="px-1 text-sm font-semibold uppercase tracking-wide text-slate-500">Camere completate</h3>
+          {completedRooms.length === 0 && <p className="card text-sm text-slate-500">Nessuna camera completata.</p>}
+          {completedRooms.map((room) => (
+            <article key={room.id} className="card space-y-1 opacity-80">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-bold">{room.roomNumber}</h4>
+                <span className="chip bg-green-100 text-green-700">completata</span>
+              </div>
+              <p className="text-sm">Piano {room.floor} · {room.roomType}</p>
+              <p className="text-xs text-slate-500">Agg. {formatTime(room.lastUpdatedAt)}</p>
+            </article>
+          ))}
+        </div>
+      )}
       {linenRoomId && (
         <LinenModal
           onClose={() => setLinenRoomId(null)}
