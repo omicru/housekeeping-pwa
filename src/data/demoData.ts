@@ -14,29 +14,63 @@ export const demoUsers: AppUser[] = [
 
 const roomAttendants = ['u-cam-1', 'u-cam-2', 'u-cam-3'];
 
-function roomTypeFor(index: number): DailyRoomAssignment['roomType'] {
-  if (index < 2) return 'quadrupla';
-  if (index < 17) return 'tripla';
-  if (index < 132) return 'doppia';
-  return 'singola';
+const missingRooms = new Set(['113', '117', '213', '217', '313', '317', '413', '417', '513', '517', '613']);
+const tripleRooms = new Set(['101', '103', '104', '201', '203', '204', '301', '303', '304', '401', '403', '404']);
+const quadrupleRooms = new Set(['172', '604']);
+
+const roomStatuses: DailyRoomAssignment['housekeepingStatus'][] = ['partenza', 'fermata', 'occupata', 'gia_pulita', 'ispezione'];
+
+function buildFloorRange(start: number, end: number): string[] {
+  const rooms: string[] = [];
+  for (let room = start; room <= end; room += 1) {
+    const roomNumber = String(room);
+    if (!missingRooms.has(roomNumber)) rooms.push(roomNumber);
+  }
+  return rooms;
 }
 
-function statusFor(index: number): DailyRoomAssignment['housekeepingStatus'] {
-  const statuses: DailyRoomAssignment['housekeepingStatus'][] = ['partenza', 'fermata', 'occupata', 'gia_pulita', 'ispezione'];
-  return statuses[index % statuses.length];
+const roomNumbers: string[] = [
+  '170',
+  '171',
+  '172',
+  '173',
+  '174',
+  ...buildFloorRange(101, 131),
+  ...buildFloorRange(201, 231),
+  ...buildFloorRange(301, 331),
+  ...buildFloorRange(401, 429),
+  ...buildFloorRange(501, 519),
+  ...buildFloorRange(601, 614)
+];
+
+function roomTypeFor(roomNumber: string): DailyRoomAssignment['roomType'] {
+  if (quadrupleRooms.has(roomNumber)) return 'quadrupla';
+  if (tripleRooms.has(roomNumber)) return 'tripla';
+  return 'doppia';
 }
 
-export const demoRooms: DailyRoomAssignment[] = Array.from({ length: 149 }, (_, i) => {
-  const roomNumber = (101 + i).toString();
-  const floor = Math.min(5, Math.floor((101 + i) / 100));
+function peopleCountFor(roomType: DailyRoomAssignment['roomType']): 1 | 2 | 3 | 4 {
+  if (roomType === 'quadrupla') return 4;
+  if (roomType === 'tripla') return 3;
+  if (roomType === 'singola') return 1;
+  return 2;
+}
+
+function floorFor(roomNumber: string): number {
+  if (roomNumber.startsWith('17')) return 0;
+  return Number(roomNumber.charAt(0));
+}
+
+export const demoRooms: DailyRoomAssignment[] = roomNumbers.map((roomNumber, i) => {
+  const roomType = roomTypeFor(roomNumber);
   return {
     id: `r-${roomNumber}`,
     date: today,
     roomNumber,
-    floor,
-    roomType: roomTypeFor(i),
-    housekeepingStatus: statusFor(i),
-    peopleCount: (Math.min(4, (i % 4) + 1) as 1 | 2 | 3 | 4),
+    floor: floorFor(roomNumber),
+    roomType,
+    housekeepingStatus: roomStatuses[i % roomStatuses.length],
+    peopleCount: peopleCountFor(roomType),
     extraBed: i % 18 === 0,
     balcony: i % 7 === 0,
     specialNotes: i % 16 === 0 ? 'Controllare minibar e amenities' : undefined,
@@ -53,7 +87,7 @@ function applyScenario(roomNumber: string, patch: Partial<DailyRoomAssignment>):
 }
 
 applyScenario('214', { housekeepingStatus: 'fermata', supervisorNote: 'Cliente prolunga, rifare più tardi' });
-applyScenario('307', { roomType: 'tripla', peopleCount: 3, supervisorNote: 'Aggiunto terzo ospite' });
+applyScenario('304', { roomType: 'tripla', peopleCount: 3, supervisorNote: 'Aggiunto terzo ospite' });
 applyScenario('118', { housekeepingStatus: 'urgente', specialNotes: 'Arrivo VIP ore 12:30' });
 applyScenario('512', { housekeepingStatus: 'fuori_servizio', specialNotes: 'Guasto bagno, bloccare camera' });
 applyScenario('409', { assignedUserId: 'u-cam-3', supervisorNote: 'Riassegnata per carico lavoro' });
@@ -77,7 +111,7 @@ export const demoTasks: FacchinoTask[] = [
   zone: i < 4 ? 'Hall' : i < 8 ? 'Piani 1-3' : 'Piani 4-5',
   priority: i % 4 === 0 ? 'alta' : i % 2 === 0 ? 'media' : 'bassa',
   suggestedTime: `${8 + i}:00`,
-  status: i % 3 === 0 ? 'in_corso' : 'da_fare',
+  status: i % 5 === 0 ? 'fatto' : i % 3 === 0 ? 'in_corso' : 'da_fare',
   assignedUserId: i % 2 === 0 ? 'u-fac-1' : 'u-fac-2',
   updatedAt: now,
   note: i % 4 === 0 ? 'Priorità alta prima delle 11:00' : undefined

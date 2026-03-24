@@ -20,7 +20,7 @@ export function IssueReportingPage(): JSX.Element {
       <form onSubmit={submit} className="card space-y-3">
         <h2 className="text-xl font-bold">Segnala problema</h2>
         <select className="w-full rounded-xl border p-3" value={category} onChange={(e) => setCategory(e.target.value as typeof categories[number])}>
-          {categories.map((c) => <option key={c} value={c}>{c.replaceAll('_', ' ')}</option>)}
+          {categories.map((c) => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
         </select>
         <textarea placeholder="Nota opzionale" className="w-full rounded-xl border p-3" value={note} onChange={(e) => setNote(e.target.value)} />
         <button className="btn-primary" type="submit">Invia</button>
