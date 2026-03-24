@@ -2,6 +2,8 @@ export type Role = 'supervisor' | 'cameriera' | 'facchino';
 
 export type RoomType = 'doppia' | 'tripla' | 'quadrupla';
 
+export type WorkdayStatus = 'attivo' | 'chiuso';
+
 export type RoomWorkStatus = 'da_fare' | 'in_corso' | 'completata';
 
 export type FacchinoTaskStatus = 'da_fare' | 'in_corso' | 'completata';
@@ -12,6 +14,7 @@ export interface AppUser {
   fullName: string;
   role: Role;
   isActive: boolean;
+  createdAt: string;
 }
 
 export interface HotelRoom {
@@ -19,20 +22,33 @@ export interface HotelRoom {
   roomNumber: string;
   floor: number;
   roomType: RoomType;
-  beds: 2 | 3 | 4;
+  peopleCapacity: 2 | 3 | 4;
+  hasMinibar: boolean;
+  isActive: boolean;
+}
+
+export interface Workday {
+  id: string;
+  workDate: string;
+  status: WorkdayStatus;
+  createdBy: string;
+  createdAt: string;
 }
 
 export interface DailyRoomAssignment {
   id: string;
-  date: string;
+  workdayId: string;
   roomId: string;
   assignedCamerieraId?: string;
   status: RoomWorkStatus;
-  startedAt?: string;
-  completedAt?: string;
-  completedBy?: string;
-  updatedAt: string;
+  housekeepingStatus: string;
+  peopleCount: number;
+  extraBed: boolean;
+  balcony: boolean;
+  urgent: boolean;
+  vip: boolean;
   supervisorNote?: string;
+  updatedAt: string;
 }
 
 export interface LinenUsage {
@@ -69,11 +85,43 @@ export interface RoomCompletion {
 
 export interface FacchinoTask {
   id: string;
-  date: string;
+  workdayId: string;
   title: string;
   area: string;
   priority: 'bassa' | 'media' | 'alta';
+  suggestedTime?: string;
   assignedFacchinoId: string;
   status: FacchinoTaskStatus;
+  note?: string;
   updatedAt: string;
 }
+
+export interface IssueReport {
+  id: string;
+  workdayId: string;
+  category: string;
+  note?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export const emptyLinenUsage = (): LinenUsage => ({
+  federe: 0,
+  lenzuolo: 0,
+  coprilenzuolo: 0,
+  asciugamaniViso: 0,
+  asciugamaniGrandi: 0,
+  asciugamaniBidet: 0
+});
+
+export const emptyMinibarUsage = (): MinibarUsage => ({
+  acquaNaturale: 0,
+  acquaFrizzante: 0,
+  cocaCola: 0,
+  estathe: 0,
+  fanta: 0,
+  succo: 0,
+  snackDolce: 0,
+  snackSalato: 0,
+  prosecco: 0
+});

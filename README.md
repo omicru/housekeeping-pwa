@@ -1,51 +1,73 @@
-# Housekeeping Hotel PWA (V1.5 demo)
+# Housekeeping Hotel PWA (Supabase realtime)
 
 PWA mobile-first in italiano per operazioni housekeeping reali (supervisor, cameriere ai piani, facchini).
 
-## Cosa include questa V1.5
+Questa versione mantiene il flusso operativo V1.5 (mappa camere, completamento camera in 3 step, sezioni attive/completate, assegnazione bulk supervisor) ma usa persistenza reale Supabase.
 
-- **Mappa camere reale** implementata esattamente da specifica (piani 0..6, esclusioni corrette, triple/quadruple corrette).
-- **Ruoli demo** separati: supervisor, cameriera, facchino.
-- **Workflow cameriera** con sezioni distinte:
-  - Camere da fare
-  - Camere in corso
-  - Camere completate
-- **Workflow facchino** con sezioni distinte:
-  - Task da fare
-  - Task in corso
-  - Task completate
-- **Flow completamento camera in 3 step**:
+## Funzioni principali
+
+- **Auth reale Supabase** email/password.
+- **Ruoli reali** da tabella `profiles`: `supervisor`, `cameriera`, `facchino`.
+- **Workday persistenti**: giornata attiva/chiusa.
+- **Assegnazioni camere persistenti** con stato workflow.
+- **Completamento camera in 3 step**:
   1. Biancheria (selector 0..4)
   2. Minibar (selector 0..4)
   3. Conferma finale
-- **Supervisor dashboard operativa** con assegnazione bulk:
-  - filtro piano
-  - filtro solo camere non assegnate
-  - selezione multipla camere
-  - assegnazione in un tap verso una cameriera
-  - conteggio carico camere per cameriera (target pratico ~14/15)
-- **Totali giornalieri demo**:
-  - biancheria
-  - minibar
+- **Task facchini persistenti** con stato da fare/in corso/completata.
+- **Realtime Supabase** su workday, room assignments, task, linen, minibar.
+- **RLS** per accessi per ruolo e assegnazione.
 
-## Stack
+## Struttura dati Supabase
 
-- React + TypeScript + Vite + Tailwind
-- Routing con `react-router-dom`
-- PWA (`vite-plugin-pwa`)
-- Data model locale pulito, pronto a futura migrazione Supabase
+File SQL principali:
 
-## Route principali
+- `supabase/schema.sql`
+  - tipi enum ruoli/stati
+  - tabelle: `profiles`, `hotel_rooms`, `workdays`, `room_assignments`, `linen_entries`, `minibar_entries`, `facchino_tasks`, `issue_reports`, `app_settings`, `activity_log`
+  - view `v_room_completions`
+  - trigger `handle_new_user` su `auth.users`
+  - policy RLS per supervisor/cameriera/facchino
+  - pubblicazione realtime
+- `supabase/seed.sql`
+  - seed mappa camere reale (149 camere)
+  - app settings base
+  - guida creazione utenti iniziali
 
-- `/` Login demo
-- `/supervisor` Dashboard supervisor
-- `/cameriera` Vista cameriera
-- `/facchino` Vista facchino
+## Setup ambiente
+
+1. Installa dipendenze:
+
+```bash
+npm install
+```
+
+2. Crea `.env` partendo da `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+3. Compila `.env`:
+
+```env
+VITE_SUPABASE_URL=https://emavjkfjaggjcxkuogay.supabase.co
+VITE_SUPABASE_ANON_KEY=...anon key...
+```
+
+> Non committare mai il file `.env`.
+
+## Setup Supabase (Dashboard SQL Editor)
+
+1. Esegui `supabase/schema.sql`.
+2. Esegui `supabase/seed.sql`.
+3. In **Authentication > Users** crea gli utenti iniziali (email/password).
+4. Assicurati che `public.profiles` abbia ruoli corretti.
+5. Avvia app locale.
 
 ## Avvio locale
 
 ```bash
-npm install
 npm run dev
 ```
 
@@ -56,13 +78,22 @@ npm run typecheck
 npm run build
 ```
 
-## Nota architetturale
+## Flussi operativi mantenuti
 
-Il modello dati locale separa chiaramente:
+### Cameriera
+- Camere da fare
+- Camere in corso
+- Camere completate
+- Tasto `Completata` -> wizard biancheria/minibar/conferma
 
-- camere (`HotelRoom`)
-- assegnazioni giornaliere (`DailyRoomAssignment`)
-- completamenti con consumi (`RoomCompletion`)
-- task facchini (`FacchinoTask`)
+### Facchino
+- Task da fare
+- Task in corso
+- Task completate
 
-Questa struttura è pensata per passare facilmente a Supabase (tabelle relazionali + realtime) in un secondo step.
+### Supervisor
+- Crea/seleziona giornata attiva
+- Assegna camere in bulk
+- Crea task facchini
+- Monitora avanzamento e totali
+

@@ -60,11 +60,11 @@ export function CamerieraTodayPage(): JSX.Element {
       {room.status !== 'completata' && (
         <div className="grid grid-cols-2 gap-2">
           {room.status === 'da_fare' ? (
-            <button type="button" className="rounded-xl bg-amber-500 py-3 text-lg font-bold text-white" onClick={() => setRoomStatus(room.assignmentId, 'in_corso')}>
+            <button type="button" className="rounded-xl bg-amber-500 py-3 text-lg font-bold text-white" onClick={() => void setRoomStatus(room.assignmentId, 'in_corso')}>
               Inizia
             </button>
           ) : (
-            <button type="button" className="rounded-xl border border-slate-300 py-3 text-lg font-bold" onClick={() => setRoomStatus(room.assignmentId, 'da_fare')}>
+            <button type="button" className="rounded-xl border border-slate-300 py-3 text-lg font-bold" onClick={() => void setRoomStatus(room.assignmentId, 'da_fare')}>
               Rimetti da fare
             </button>
           )}
@@ -109,7 +109,7 @@ export function CamerieraTodayPage(): JSX.Element {
           onBack={() => setStep((prev) => (prev === 1 ? 1 : ((prev - 1) as 1 | 2 | 3)))}
           onNext={() => setStep((prev) => (prev === 3 ? 3 : ((prev + 1) as 1 | 2 | 3)))}
           onConfirm={() => {
-            completeRoomWithUsage(draft.assignmentId, draft.linen, draft.minibar, currentUser.id);
+            void completeRoomWithUsage(draft.assignmentId, draft.linen, draft.minibar, currentUser.id);
             setDraft(null);
           }}
           onLinenChange={(key, value) => setDraft((prev) => (prev ? { ...prev, linen: { ...prev.linen, [key]: value } } : prev))}
