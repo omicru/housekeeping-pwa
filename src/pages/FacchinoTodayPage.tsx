@@ -25,15 +25,15 @@ export function FacchinoTodayPage(): JSX.Element {
       {task.status !== 'completata' && (
         <div className="grid grid-cols-2 gap-2">
           {task.status === 'da_fare' ? (
-            <button type="button" className="rounded-xl bg-amber-500 py-3 text-base font-bold text-white" onClick={() => updateFacchinoTaskStatus(task.id, 'in_corso')}>
+            <button type="button" className="rounded-xl bg-amber-500 py-3 text-base font-bold text-white" onClick={() => void updateFacchinoTaskStatus(task.id, 'in_corso')}>
               Inizia
             </button>
           ) : (
-            <button type="button" className="rounded-xl border border-slate-300 py-3 text-base font-bold" onClick={() => updateFacchinoTaskStatus(task.id, 'da_fare')}>
+            <button type="button" className="rounded-xl border border-slate-300 py-3 text-base font-bold" onClick={() => void updateFacchinoTaskStatus(task.id, 'da_fare')}>
               Rimetti da fare
             </button>
           )}
-          <button type="button" className="rounded-xl bg-green-600 py-3 text-base font-bold text-white" onClick={() => updateFacchinoTaskStatus(task.id, 'completata')}>
+          <button type="button" className="rounded-xl bg-green-600 py-3 text-base font-bold text-white" onClick={() => void updateFacchinoTaskStatus(task.id, 'completata')}>
             Completata
           </button>
         </div>

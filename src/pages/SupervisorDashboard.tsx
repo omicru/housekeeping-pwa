@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useApp } from '../lib/AppContext';
 
 const linenLabels = {
@@ -23,13 +23,33 @@ const minibarLabels = {
 } as const;
 
 export function SupervisorDashboard(): JSX.Element {
-  const { rooms, assignments, users, facchinoTasks, completions, assignRoomsBulk, getRoomById } = useApp();
+  const {
+    rooms,
+    assignments,
+    users,
+    workdays,
+    activeWorkday,
+    facchinoTasks,
+    completions,
+    createWorkday,
+    setActiveWorkday,
+    createFacchinoTask,
+    assignRoomsBulk,
+    getRoomById
+  } = useApp();
   const [selectedFloor, setSelectedFloor] = useState<'tutti' | number>('tutti');
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const [selectedCameriera, setSelectedCameriera] = useState<string>('');
   const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
+  const [newWorkdayDate, setNewWorkdayDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskZone, setTaskZone] = useState('');
+  const [taskPriority, setTaskPriority] = useState<'bassa' | 'media' | 'alta'>('media');
+  const [taskAssignedTo, setTaskAssignedTo] = useState('');
 
   const cameriere = users.filter((user) => user.role === 'cameriera');
+  const facchini = users.filter((user) => user.role === 'facchino');
 
   const assignmentRows = useMemo(
     () =>
@@ -59,10 +79,23 @@ export function SupervisorDashboard(): JSX.Element {
     setSelectedRooms((prev) => (prev.includes(roomId) ? prev.filter((current) => current !== roomId) : [...prev, roomId]));
   };
 
-  const assignSelectedRooms = (): void => {
+  const assignSelectedRooms = async (): Promise<void> => {
     if (!selectedCameriera || selectedRooms.length === 0) return;
-    assignRoomsBulk(selectedRooms, selectedCameriera);
+    await assignRoomsBulk(selectedRooms, selectedCameriera);
     setSelectedRooms([]);
+  };
+
+  const onCreateTask = async (event: FormEvent): Promise<void> => {
+    event.preventDefault();
+    if (!taskTitle || !taskZone || !taskAssignedTo) return;
+    await createFacchinoTask({
+      title: taskTitle,
+      zone: taskZone,
+      priority: taskPriority,
+      assignedToProfileId: taskAssignedTo
+    });
+    setTaskTitle('');
+    setTaskZone('');
   };
 
   const roomGroups = {
@@ -101,6 +134,26 @@ export function SupervisorDashboard(): JSX.Element {
 
   return (
     <div className="space-y-4">
+      <section className="card space-y-3">
+        <h2 className="text-xl font-bold">Giornata di lavoro</h2>
+        <p className="text-sm">Giornata attiva: {activeWorkday?.workDate ?? 'nessuna'}</p>
+        <div className="grid grid-cols-2 gap-2">
+          <select className="rounded-xl border p-3 text-base" value={activeWorkday?.id ?? ''} onChange={(event) => void setActiveWorkday(event.target.value)}>
+            {workdays.map((workday) => (
+              <option value={workday.id} key={workday.id}>
+                {workday.workDate} · {workday.status}
+              </option>
+            ))}
+          </select>
+          <div className="flex gap-2">
+            <input type="date" className="w-full rounded-xl border p-3 text-base" value={newWorkdayDate} onChange={(event) => setNewWorkdayDate(event.target.value)} />
+            <button type="button" className="rounded-xl bg-slate-900 px-3 py-3 text-sm font-bold text-white" onClick={() => void createWorkday(newWorkdayDate)}>
+              Crea
+            </button>
+          </div>
+        </div>
+      </section>
+
       <section className="card space-y-3">
         <h2 className="text-xl font-bold">Assegnazione rapida camere</h2>
         <div className="grid grid-cols-2 gap-2">
@@ -155,9 +208,35 @@ export function SupervisorDashboard(): JSX.Element {
           ))}
         </div>
 
-        <button type="button" className="rounded-xl bg-slate-900 py-3 text-lg font-bold text-white disabled:opacity-40" disabled={!selectedCameriera || selectedRooms.length === 0} onClick={assignSelectedRooms}>
+        <button type="button" className="rounded-xl bg-slate-900 py-3 text-lg font-bold text-white disabled:opacity-40" disabled={!selectedCameriera || selectedRooms.length === 0} onClick={() => void assignSelectedRooms()}>
           Assegna camere selezionate
         </button>
+      </section>
+
+      <section className="card space-y-3">
+        <h3 className="text-lg font-bold">Nuovo task facchino</h3>
+        <form className="space-y-2" onSubmit={(event) => void onCreateTask(event)}>
+          <input className="w-full rounded-xl border p-3 text-sm" placeholder="Titolo task" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} />
+          <input className="w-full rounded-xl border p-3 text-sm" placeholder="Zona" value={taskZone} onChange={(event) => setTaskZone(event.target.value)} />
+          <div className="grid grid-cols-2 gap-2">
+            <select className="rounded-xl border p-3 text-sm" value={taskPriority} onChange={(event) => setTaskPriority(event.target.value as 'bassa' | 'media' | 'alta')}>
+              <option value="bassa">Bassa</option>
+              <option value="media">Media</option>
+              <option value="alta">Alta</option>
+            </select>
+            <select className="rounded-xl border p-3 text-sm" value={taskAssignedTo} onChange={(event) => setTaskAssignedTo(event.target.value)}>
+              <option value="">Assegna a...</option>
+              {facchini.map((facchino) => (
+                <option key={facchino.id} value={facchino.id}>
+                  {facchino.fullName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white">
+            Crea task
+          </button>
+        </form>
       </section>
 
       <section className="card">
